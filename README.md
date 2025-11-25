@@ -1,83 +1,296 @@
-# ML25_Gipsy
+# Explainable Motion Classification
 
-⏰ 주요 일정 및 할 일 (Timeline & Tasks)
+## 0. Setup and Run Manual (Quickstart)
 
-    11주차: 팀 밋업 및 피드백 활동 시작
+### Step 1. Activate Conda Environment
 
-    11~14주차: 구현 기간 (Implementation)
+```
+conda activate gipsyml
+```
 
-    상시: 멘토링 보고서 3회 작성 (We-Meet Program, LMS 공지)
+### Step 2. Ensure Project Structure
 
-    12월 16일 (화) (15주차) 수업 전: 1번 항목(최종 결과물) 제출 마감
+```
+ML25_Gipsy/
+    1_preprocessing.py
+    2_feature_engineering.py
+    3_model_training.py
+    4_main.py
+    csv_data_7/
+        circle/
+        diagonal_left/
+        diagonal_right/
+        horizontal/
+        vertical/
+```
 
-    12월 16일 (화) (15주차): 최종 발표 (Demo Day)
+### Step 3. Check CSV Format
 
-        3분 발표 (접근법, 작동 방식)
+Must be comma-separated:
 
-        3분 데모 (라이브 또는 비디오)
+```
+392,-440,-84
+```
 
-    12월 18일 (목): 2번 항목(동료 검토 보고서) 제출 마감
+If your data has slashes (`392/-440/-84`), convert them or update loader.
 
-📦 제출물 (Deliverables)
+### Step 4. Update Data Path
 
-1. 최종 결과물 (12/16 마감)
+Inside `4_main.py`:
 
-    A. AI 모델/알고리즘 코드: 팀이 구축한 소스 코드
+```
+DATA_ROOT = "./csv_data_7"
+```
 
-    B. 최종 보고서 (Final Report)
+### Step 5. Run Pipeline
 
-        분량: 10페이지 이내 (표, 그림 포함 / 참고문헌 제외)
+```
+python 4_main.py
+```
 
-        주의: 커버 페이지 만들지 말 것 (만들 경우 1페이지로 간주)
+This will:
 
-        필수 내용:
+* load CSV files
+* resample
+* denoise
+* extract features
+* train Random Forest
+* print top features (explainability)
 
-            i. 목표 (Objectives)
+### Step 6. Troubleshooting
 
-            ii. 접근법, 아이디어, 이론적 배경
+* **No valid CSV loaded:** check separators and folder names.
+* **Failed to load data:** confirm csv_data_7 exists and contains subfolders.
+* **0 samples processed:** CSV files must contain 3 numeric columns.
 
-            iii. 구현 설명 및 작동 방식
+---
 
-            iv. 엣지 케이스 논의 또는 의미 있는 인사이트
+### ML25 Gipsy Project
 
-    C. 오픈 리포지토리 (e.g., Github)
+This repository implements a lightweight and explainable machine learning pipeline for classifying human arm motion using 3D End Effector Position time series data. The system preprocesses noisy data, extracts interpretable features, trains a Random Forest classifier, and outputs feature importance as the explanation.
 
-        소스 코드
+---
 
-        [필수] 개인별 기여도 명시 (누가 어떤 부분을 작업했는지 명확히 기재)
+## 1. Dataset
 
-    D. 라이트닝 토크 발표 자료 (12/16 발표용)
+**Important format note:**
+Your raw motion files must contain **three numeric columns (X, Y, Z)** separated by commas.
+Example:
 
-2. 동료 검토 보고서 (12/18 마감)
+```
+392,-440,-84
+```
 
-    개인별 제출
+If your files use slashes instead of commas:
 
-    LMS에 추후 업로드될 링크를 통해 제출
+```
+392/-440/-84
+```
 
-📊 데이터셋 
+you must either:
 
-    사용할 데이터: [6]번 열 (실제 7번째 열)의 End Effector Position
+* convert `/` to `,`, or
 
-    데이터 형식: X/Y/Z (예: 392/-440/-84)
+* modify the loader to accept slashes as separators.
 
-        (X=392mm, Y=-440mm, Z=-84mm)
+* Input: End Effector Position (X, Y, Z in millimeters)
 
-        Origin (0,0,0) = 어깨 관절
+* Origin at shoulder joint (0, 0, 0)
 
-    데이터 현황:
+* First batch: 34 good samples
 
-        1차 : 34개의 적은 샘플 (Good samples)
+* Second batch: Good plus noisy samples
 
-        2차 : Good + Noisy data 포함된 2차 데이터 업로드 예정
+* Data is limited, so augmentation is recommended
 
-    [중요] 데이터가 매우 적으므로 데이터 증강(Augmentation) 기법을 고려해야 함
+Expected structure:
 
-👥 팀 및 기타 공지 (Team & Notices)
+```
+csv_data_7/
+    motion_1/*.csv
+    motion_2/*.csv
+```
 
-    팀 구성: 3명 또는 4명 (강제 혼합 없음)
+---
 
-    필수 사항:
+## 2. Pipeline Overview
 
-        모든 소스 코드와 문서는 Github 등 리포지토리에 업로드
+### Step 1. Load and Preprocess
 
-        모든 자료에 개인별 기여도 명시
+* Reads CSV time series
+* Resamples to fixed length (TARGET_LENGTH)
+* Applies Butterworth low pass filter
+* Output: (n_samples, time_length, 3)
+
+### Step 2. Feature Extraction
+
+Current features (placeholders):
+
+* Mean of first dimension
+* Maximum velocity magnitude
+  Future features:
+* Statistical metrics
+* Dynamic metrics
+* DTW distances
+
+### Step 3. Model Training and Explainability
+
+* StandardScaler normalization
+* Stratified 5 fold cross validation
+* Random Forest classifier
+* Aggregated feature importance
+
+### Step 4. Summary Output
+
+* Total samples
+* Top features ranked by importance
+
+---
+
+## 3. Usage
+
+Install requirements:
+
+```
+numpy
+pandas
+scipy
+scikit-learn
+tslearn
+```
+
+Set dataset path in code:
+
+```python
+DATA_ROOT = 'path/to/csv_data_7'
+```
+
+Run:
+
+```bash
+python main.py
+```
+
+---
+
+## 4. Code Structure
+
+* load_and_preprocess_data()
+  Loads, resamples, and denoises time series
+* extract_features()
+  Converts each time series into a feature vector
+* train_and_explain_model()
+  Trains classifier and computes feature importance
+* main_program()
+  Full pipeline runner
+
+---
+
+## 5. Example Output
+
+```
+--- Model Summary and Explanation ---
+Total samples processed: 34
+
+Top Features:
+| Feature        | Importance |
+| Mean_DIM_0     | 0.45       |
+| Max_Velocity   | 0.29       |
+```
+
+---
+
+## 6. ML25 Gipsy Requirements
+
+### Timeline
+
+* Weeks 11 to 14: Implementation
+* Dec 16: Final code plus report plus presentation
+* Dec 18: Peer review report
+
+### Deliverables
+
+1. Source code
+2. Final report (max 10 pages)
+3. Public repository with contributions
+4. Lightning talk slides
+
+### Team
+
+* 3 to 4 members
+* Must document individual contributions
+
+---
+
+## 6. Running the Code (Manual)
+
+### Step 1. Activate the Conda Environment
+
+```
+conda activate gipsyml
+```
+
+### Step 2. Confirm Project Structure
+
+Your repository should contain:
+
+```
+ML25_Gipsy/
+    1_preprocessing.py
+    2_feature_engineering.py
+    3_model_training.py
+    4_main.py
+    csv_data_7/
+        circle/
+        diagonal_left/
+        diagonal_right/
+        horizontal/
+        vertical/
+```
+
+Make sure your data uses comma-separated values:
+
+```
+392,-440,-84
+```
+
+If using `/` separators, update the loader or convert the files.
+
+### Step 3. Update DATA_ROOT Path
+
+Inside **4_main.py**:
+
+```
+DATA_ROOT = "./csv_data_7"
+```
+
+This must point to your motion folders.
+
+### Step 4. Run the Full Pipeline
+
+```
+python 4_main.py
+```
+
+If everything is correct, the output will show:
+
+* number of samples loaded
+* extracted features
+* feature importance table (explainability)
+
+### Step 5. Troubleshooting
+
+* If you see **"No valid CSV loaded"**, check separators and folder names.
+* If you see **"Failed to load data"**, confirm dataset folder structure.
+* If the program runs but outputs 0 samples, confirm that each file has 3 numeric columns.
+
+---
+
+## 7. Future Work
+
+* Full DTW features
+* Data augmentation routines
+* Additional dynamic features
+* SHAP or LIME explainability
+
+---
