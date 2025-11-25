@@ -27,29 +27,45 @@ RANDOM_STATE = 42
 
 
 def main():
+    print("="*60)
+    print("TRAINING MOTION CLASSIFIER")
+    print("="*60)
+    
     # Step 1: Load + Denoise
+    print("\n[1/3] Loading and preprocessing data...")
     X_denoised, labels = load_and_preprocess_data(DATA_ROOT, TARGET_LENGTH)
     if X_denoised.size == 0:
-        print("Failed to load data.")
+        print("❌ Failed to load data.")
         return
 
-    print(f"Loaded {len(X_denoised)} samples")
-    print(f"Shape: {X_denoised.shape}")
-    print(f"Classes: {np.unique(labels)}")
+    print(f"✅ Loaded {len(X_denoised)} samples")
+    print(f"   Shape: {X_denoised.shape}")
+    print(f"   Classes: {np.unique(labels)}")
 
     # Step 2: Feature extraction
+    print("\n[2/3] Extracting features...")
     X_feat, feat_names = extract_features(X_denoised, labels)
-    print(f"Extracted features shape: {X_feat.shape}")
+    print(f"✅ Extracted features shape: {X_feat.shape}")
+    print(f"   Features: {feat_names}")
 
     # Step 3: Train and explain
-    results = train_and_explain_model(
+    print("\n[3/3] Training model...")
+    results, mean_acc = train_and_explain_model(
         X_feat, labels, feat_names,
         N_ESTIMATORS, RANDOM_STATE
     )
 
-    print("\nTotal samples:", X_feat.shape[0])
+    print("\n" + "="*60)
+    print("TRAINING COMPLETE!")
+    print("="*60)
+    print(f"Total samples: {X_feat.shape[0]}")
+    print(f"Mean Cross-Validation Accuracy: {mean_acc:.4f}")
     print("\nFeature Importance:")
     print(results)
+    print("\n" + "="*60)
+    print("Model saved as 'trained_model.pkl'")
+    print("Use '5_classifier_test.py' to classify new data")
+    print("="*60)
 
 
 if __name__ == "__main__":
