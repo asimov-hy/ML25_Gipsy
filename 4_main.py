@@ -33,7 +33,7 @@ def main():
     
     # Step 1: Load + Denoise
     print("\n[1/3] Loading and preprocessing data...")
-    X_denoised, labels = load_and_preprocess_data(DATA_ROOT, TARGET_LENGTH)
+    X_denoised, labels = load_and_preprocess_data(DATA_ROOT, TARGET_LENGTH, augment=True)
     if X_denoised.size == 0:
         print("❌ Failed to load data.")
         return
