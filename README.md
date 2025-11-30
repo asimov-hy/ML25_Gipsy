@@ -294,3 +294,28 @@ If everything is correct, the output will show:
 * SHAP or LIME explainability
 
 ---
+
+Data Augmentation Implementation
+
+To address the challenge of a limited dataset (Small Data) and ensure model robustness against sensor noise, we implemented a data augmentation pipeline within the preprocessing stage.
+
+Methodology:
+We applied two primary augmentation techniques to the preprocessed time-series data:
+
+Jittering (Noise Injection): * Adds Gaussian noise ($\mu=0, \sigma=0.02$) to the 3D coordinates.
+
+Simulates sensor instability and prevents the model from overfitting to exact coordinate paths.
+
+Scaling:
+
+Multiplies the entire trajectory by a random scalar factor drawn from a uniform distribution $U(0.9, 1.1)$.
+
+Simulates variations in user arm length and motion amplitude.
+
+Outcome:
+
+Each original sample generates 5 augmented variations.
+
+This effectively increases the training dataset size by 6x, significantly improving the generalization capability of the Random Forest classifier.
+
+Implementation can be found in 1_preprocessing.py via the augment_data function.
