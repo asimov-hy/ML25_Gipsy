@@ -1,8 +1,0 @@
-# Default ignored files
-/shelf/
-/workspace.xml
-.idea/
-*.xml
-*.iml
-__pycache__/
-*.pkl
