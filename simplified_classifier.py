@@ -2,7 +2,7 @@
 # CONFIGURATION
 # ============================================
 
-DATASET_FILE = "data/processed/dataset_raw.pkl"
+DATASET_FILE = "data/processed/dataset1+2_raw.pkl"
 
 # ============================================
 

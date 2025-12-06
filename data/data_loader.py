@@ -4,11 +4,11 @@
 
 INPUT_DIRS = [
     "data/data1-filtered",
-    # "data/data2",  # Add more as needed
+    "data/data2-filtered",
 ]
 
-OUTPUT_RAW = "data/processed/dataset_raw.pkl"    # For geometric classifier
-OUTPUT_NORM = "data/processed/dataset_norm.pkl"  # For KNN/ML
+OUTPUT_RAW = "data/processed/dataset1+2_raw.pkl"    # For geometric classifier
+OUTPUT_NORM = "data/processed/dataset1+2_norm.pkl"  # For KNN/ML
 
 # ============================================
 
