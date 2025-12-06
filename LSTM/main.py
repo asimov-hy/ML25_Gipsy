@@ -10,14 +10,19 @@ from preprocessing import load_data, SensorDataset, collate_fn
 from model_definition import SensorLSTM
 from model_training import train_one_epoch, evaluate
 
-DATA_DIR = 'csv_data_7'
-EPOCHS = 100            
-BATCH_SIZE = 16         
-LEARNING_RATE = 0.001   
-HIDDEN_SIZE = 64        
-SEED = 42               
-SAVE_PATH = 'best_model.pt'
+# ==========================================
+# CONFIGURATION
+# ==========================================
+# Path to the pre-processed pickle file
+DATA_PATH = "../data/processed/dataset1+2_raw.pkl"
 
+EPOCHS = 200
+BATCH_SIZE = 16
+LEARNING_RATE = 0.001
+HIDDEN_SIZE = 64
+SEED = 42
+SAVE_PATH = 'best_model.pt'
+# ==========================================
 
 def set_seed(seed):
     random.seed(seed)
@@ -27,26 +32,19 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 def main():
-    # Apply Setting
     set_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    print(f"Configuration: Epochs={EPOCHS}, Batch={BATCH_SIZE}, LR={LEARNING_RATE}, Hidden={HIDDEN_SIZE}")
-
-    # 1. Load Data
-    if not os.path.exists(DATA_DIR):
-        print(f"Data directory '{DATA_DIR}' not found.")
-        return
-
-    sequences, labels, label_map = load_data(DATA_DIR)
-    print(f"Total sequences: {len(sequences)}")
-    print(f"Labels: {label_map}")
+    
+    # 1. Load Data from Pickle
+    sequences, labels, label_map = load_data(DATA_PATH)
     
     if len(sequences) == 0:
-        print("Error: No data loaded. Please check your csv files.")
+        print("Error: No data loaded. Check the pickle file path.")
         return
 
     # 2. Split Data
+    # Stratified split to maintain class balance
     train_seqs, temp_seqs, train_labels, temp_labels = train_test_split(
         sequences, labels, test_size=0.3, stratify=labels, random_state=SEED
     )
@@ -55,6 +53,7 @@ def main():
     )
 
     # 3. Create Datasets
+    # Apply Augmentation ONLY to the Training set
     train_dataset = SensorDataset(train_seqs, train_labels, augment=True)
     dev_dataset = SensorDataset(dev_seqs, dev_labels, augment=False)
 
