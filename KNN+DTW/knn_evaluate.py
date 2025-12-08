@@ -1,10 +1,16 @@
+"""
+KNN + DTW Evaluation Script
+Evaluates a trained KNN model with DTW distance metric on a dataset.
+Generates accuracy metrics, confusion matrices, and visualizations.
+"""
+
 # ============================================
 # CONFIGURATION
 # ============================================
 
-INPUT_FILE = "data/processed/dataset1+2_norm.pkl"
-MODEL_PATH = "KNN+DTW/models/knn_1.pkl"
-OUTPUT_DIR = "evaluation"
+INPUT_FILE = "data/processed/dataset1_norm.pkl"
+MODEL_PATH = "KNN+DTW/models/dataset1.pkl"
+OUTPUT_DIR = "KNN+DTW/evaluation"
 
 # Cross-validation settings
 CV_FOLDS = 5
@@ -41,6 +47,12 @@ def load_model(filepath):
     return data["model"], data["label_map"]
 
 
+def get_output_dir(model_path, base_output_dir):
+    """Generate output directory from model name"""
+    model_name = os.path.splitext(os.path.basename(model_path))[0]
+    return os.path.join(base_output_dir, model_name)
+
+
 def prepare_for_tslearn(sequences):
     """Convert list of variable-length arrays to tslearn format"""
     max_len = max(len(s) for s in sequences)
@@ -69,7 +81,7 @@ def plot_confusion_matrix(y_true, y_pred, label_map, save_path=None):
         plt.savefig(save_path, dpi=150)
         print(f"Saved: {save_path}")
     
-    plt.show()
+    plt.close()
     return cm
 
 
@@ -91,7 +103,7 @@ def plot_normalized_confusion_matrix(y_true, y_pred, label_map, save_path=None):
         plt.savefig(save_path, dpi=150)
         print(f"Saved: {save_path}")
     
-    plt.show()
+    plt.close()
     return cm
 
 
@@ -124,7 +136,7 @@ def plot_k_comparison(k_values, scores, save_path=None):
         plt.savefig(save_path, dpi=150)
         print(f"Saved: {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def plot_per_class_metrics(y_true, y_pred, label_map, save_path=None):
@@ -157,7 +169,7 @@ def plot_per_class_metrics(y_true, y_pred, label_map, save_path=None):
         plt.savefig(save_path, dpi=150)
         print(f"Saved: {save_path}")
     
-    plt.show()
+    plt.close()
 
 
 def find_misclassified(y_true, y_pred, file_ids, label_map):
@@ -197,7 +209,7 @@ def run_k_comparison(X, y, k_values, n_folds=5):
         scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy')
         all_scores.append(scores)
         
-        print(f"k={k}: {np.mean(scores):.1%} ± {np.std(scores):.1%}")
+        print(f"k={k}: {np.mean(scores):.1%} +/- {np.std(scores):.1%}")
     
     return all_scores
 
@@ -211,8 +223,13 @@ if __name__ == "__main__":
     print("MODEL EVALUATION")
     print("=" * 50)
     
-    # Create output directory
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    # Generate output directory from model name
+    output_dir = get_output_dir(MODEL_PATH, OUTPUT_DIR)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"Input:  {INPUT_FILE}")
+    print(f"Model:  {MODEL_PATH}")
+    print(f"Output: {output_dir}")
     
     # ------------------------------------------
     # 1. Load data and model
@@ -251,7 +268,7 @@ if __name__ == "__main__":
     # Plot k comparison
     plot_k_comparison(
         K_VALUES_TO_TEST, cv_scores,
-        save_path=os.path.join(OUTPUT_DIR, "k_comparison.png")
+        save_path=os.path.join(output_dir, "k_comparison.png")
     )
     
     # ------------------------------------------
@@ -262,19 +279,19 @@ if __name__ == "__main__":
     # Confusion matrix
     plot_confusion_matrix(
         y, y_pred, label_map,
-        save_path=os.path.join(OUTPUT_DIR, "confusion_matrix.png")
+        save_path=os.path.join(output_dir, "confusion_matrix.png")
     )
     
     # Normalized confusion matrix
     plot_normalized_confusion_matrix(
         y, y_pred, label_map,
-        save_path=os.path.join(OUTPUT_DIR, "confusion_matrix_normalized.png")
+        save_path=os.path.join(output_dir, "confusion_matrix_normalized.png")
     )
     
     # Per-class metrics
     plot_per_class_metrics(
         y, y_pred, label_map,
-        save_path=os.path.join(OUTPUT_DIR, "per_class_metrics.png")
+        save_path=os.path.join(output_dir, "per_class_metrics.png")
     )
     
     # ------------------------------------------
@@ -294,7 +311,7 @@ if __name__ == "__main__":
             print(f"  ... and {len(misclassified) - 20} more")
         
         # Save full list
-        error_path = os.path.join(OUTPUT_DIR, "misclassified.txt")
+        error_path = os.path.join(output_dir, "misclassified.txt")
         with open(error_path, 'w') as f:
             for item in misclassified:
                 f.write(f"{item['file_id']}\t{item['true_label']}\t{item['predicted']}\n")
@@ -310,7 +327,7 @@ if __name__ == "__main__":
     print("=" * 50)
     print(f"Accuracy: {accuracy:.2%}")
     print(f"Errors: {len(misclassified)} / {len(y)}")
-    print(f"\nOutputs saved to: {OUTPUT_DIR}/")
+    print(f"\nOutputs saved to: {output_dir}/")
     print("  - confusion_matrix.png")
     print("  - confusion_matrix_normalized.png")
     print("  - per_class_metrics.png")

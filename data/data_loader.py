@@ -4,11 +4,9 @@
 
 INPUT_DIRS = [
     "data/data1-filtered",
-    "data/data2-filtered",
 ]
 
-OUTPUT_RAW = "data/processed/dataset1+2_raw.pkl"    # For geometric classifier
-OUTPUT_NORM = "data/processed/dataset1+2_norm.pkl"  # For KNN/ML
+OUTPUT_DIR = "data/processed"
 
 # ============================================
 
@@ -70,7 +68,7 @@ def load_dataset(input_dirs):
     print(f"Classes: {label_map}")
     
     for filepath in all_filepaths:
-        df = pd.read_csv(filepath)
+        df = pd.read_csv(filepath, header=None, names=['x', 'y', 'z'])
         seq_raw = df[['x', 'y', 'z']].values.astype(np.float32)
         seq_norm = normalize_sequence(seq_raw.copy())
         
@@ -84,6 +82,16 @@ def load_dataset(input_dirs):
         file_ids.append(file_id)
     
     return sequences_raw, sequences_norm, np.array(labels), label_map, file_ids
+
+
+def get_output_name(input_dirs):
+    """Generate output base name from input directories"""
+    if isinstance(input_dirs, str):
+        input_dirs = [input_dirs]
+    
+    # Use folder names, joined with +
+    names = [os.path.basename(d.rstrip('/')) for d in input_dirs]
+    return "+".join(names)
 
 
 def save_dataset(output_file, sequences, labels, label_map, file_ids):
@@ -129,6 +137,15 @@ if __name__ == "__main__":
     print("DATA LOADER")
     print("=" * 40)
     
+    # Generate output paths
+    base_name = get_output_name(INPUT_DIRS)
+    output_raw = os.path.join(OUTPUT_DIR, f"{base_name}_raw.pkl")
+    output_norm = os.path.join(OUTPUT_DIR, f"{base_name}_norm.pkl")
+    
+    print(f"Input:  {INPUT_DIRS}")
+    print(f"Output: {output_raw}")
+    print(f"        {output_norm}")
+    
     # Load
     seq_raw, seq_norm, labels, label_map, file_ids = load_dataset(INPUT_DIRS)
     
@@ -137,9 +154,9 @@ if __name__ == "__main__":
     
     # Save both
     print()
-    save_dataset(OUTPUT_RAW, seq_raw, labels, label_map, file_ids)
-    save_dataset(OUTPUT_NORM, seq_norm, labels, label_map, file_ids)
+    save_dataset(output_raw, seq_raw, labels, label_map, file_ids)
+    save_dataset(output_norm, seq_norm, labels, label_map, file_ids)
     
     print("\nUse:")
-    print(f"  Geometric classifier: {OUTPUT_RAW}")
-    print(f"  KNN / ML:             {OUTPUT_NORM}")
+    print(f"  Geometric classifier: {output_raw}")
+    print(f"  KNN / ML:             {output_norm}")
