@@ -105,7 +105,7 @@ if __name__ == "__main__":
     classes = list(model.classes_)
 
     if len(sys.argv) == 1:
-        root = "../data/testdata_generated_ver2(100perclass)"  # ★ 기본 테스트 폴더 설정
+        root = "../data/synthetic_test_randomized"  # ★ 기본 테스트 폴더 설정
         print(f"\n🔍 No input provided → Running AUTO TEST on: {root}")
 
         csv_files = auto_collect_files(root)
