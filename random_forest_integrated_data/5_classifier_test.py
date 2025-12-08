@@ -10,9 +10,10 @@ import glob
 from tabulate import tabulate
 
 # ----------------------------
-# SMART FEATURE IMPORT
+# FEATURE IMPORT
 # ----------------------------
-from feature_engineering import extract_smart_features
+# feature_engineering.py의 수정된 메인 함수를 임포트 (17개 특징 반환)
+from feature_engineering import extract_features 
 
 # ============================================================
 # Utility Functions
@@ -57,12 +58,12 @@ def preprocess_new_data(csv_path, target_length=100):
         return data_filtered
 
     except Exception as e:
-        print(f"❌ Error preprocessing {csv_path}: {e}")
+        # print(f"❌ Error preprocessing {csv_path}: {e}")
         return None
 
 
 # ============================================================
-# Prediction using SMART FEATURES
+# Prediction using 17 FEATURES
 # ============================================================
 
 def load_model():
@@ -75,7 +76,9 @@ def predict_motion(csv_path, model, scaler, classes):
     if data is None:
         return None, None
 
-    feat = extract_smart_features(data).reshape(1, -1)   # ★ 핵심: smart features 사용
+    # 17개 특징 추출 함수 호출. 단일 시퀀스를 배치 형태로 래핑
+    feat, _ = extract_features(np.array([data])) 
+    
     feat_scaled = scaler.transform(feat)
 
     pred = model.predict(feat_scaled)[0]
@@ -85,7 +88,7 @@ def predict_motion(csv_path, model, scaler, classes):
 
 
 def auto_collect_files(root):
-    motions = ["circle", "horizontal", "vertical", "diagonal_left", "diagonal_right"]
+    motions = ["circle", "horizontal", "vertical", "diagonal_left", "diagonal_right"] 
     files = []
     for m in motions:
         files.extend(glob.glob(os.path.join(root, m, "*.csv")))
@@ -99,13 +102,20 @@ def auto_collect_files(root):
 if __name__ == "__main__":
     print("\n===== MOTION CLASSIFIER (Random Forest - Tabulate Report Version) =====")
 
-    model_data = load_model()
+    try:
+        model_data = load_model()
+    except FileNotFoundError:
+        print("\n❌ Error: 'trained_model.pkl' not found. Please run 4_main.py first to train the model.")
+        sys.exit(1)
+        
     model = model_data["model"]
     scaler = model_data["scaler"]
     classes = list(model.classes_)
 
     if len(sys.argv) == 1:
-        root = "../data/synthetic_test_randomized"  # ★ 기본 테스트 폴더 설정
+        # 테스트 데이터 폴더 경로 설정 (사용자 환경에 맞게 조정)
+        root = "../data/testdata_generated_ver2(100perclass)"  # ★ 기본 테스트 폴더 설정
+        
         print(f"\n🔍 No input provided → Running AUTO TEST on: {root}")
 
         csv_files = auto_collect_files(root)
@@ -114,33 +124,44 @@ if __name__ == "__main__":
         results = []
 
         for idx, f in enumerate(csv_files, 1):
-            print(f"[{idx}/{len(csv_files)}] Processing {f}")
-            pred, prob = predict_motion(f, model, scaler, classes)
+            
+            try:
+                pred, prob = predict_motion(f, model, scaler, classes)
+            except Exception as e:
+                # 에러 발생 시 파일 건너뛰기
+                continue 
 
             if prob is None:
                 continue
 
             true_label = os.path.basename(os.path.dirname(f))
-
-            results.append({
+            
+            prob_dict = {
                 "file": os.path.basename(f),
                 "true": true_label,
                 "pred": pred,
                 "correct": "✓" if pred == true_label else "✗",
-                "circle": prob[classes.index("circle")],
-                "horizontal": prob[classes.index("horizontal")],
-                "vertical": prob[classes.index("vertical")],
-                "diagonal_left": prob[classes.index("diagonal_left")],
-                "diagonal_right": prob[classes.index("diagonal_right")]
-            })
+            }
+
+            for cls_name in classes:
+                if cls_name in model.classes_:
+                    prob_dict[cls_name] = prob[np.where(model.classes_ == cls_name)[0][0]]
+                else:
+                    prob_dict[cls_name] = 0.0
+            
+            results.append(prob_dict)
 
         df = pd.DataFrame(results)
 
         # -----------------------------
         # Summary Table
         # -----------------------------
-        print("\n========== FINAL SUMMARY TABLE ==========\n")
-        print(tabulate(df, headers="keys", tablefmt="fancy_grid", floatfmt=".3f"))
+        print("\n========== FINAL SUMMARY TABLE (TOP 10) ==========\n")
+        if not df.empty:
+            print(tabulate(df.head(10), headers="keys", tablefmt="fancy_grid", floatfmt=".3f"))
+        else:
+            print("No prediction results to display.")
+
 
         # -----------------------------
         # Class-wise Accuracy
@@ -172,9 +193,9 @@ if __name__ == "__main__":
             headers=["Correct", "Total", "Accuracy"],
             tablefmt="fancy_grid"
         ))
-
-        df.to_csv("prediction_report.csv", index=False)
-        print("\n📁 Saved → prediction_report.csv")
+        
+        if not df.empty:
+            df.to_csv("prediction_report.csv", index=False)
+            print("\n📁 Saved → prediction_report.csv")
 
         sys.exit(0)
-
