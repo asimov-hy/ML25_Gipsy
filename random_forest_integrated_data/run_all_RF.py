@@ -163,6 +163,7 @@ if __name__ == "__main__":
     collect_txt(root),
     key=lambda x: extract_number_from_filename(os.path.basename(x))
 )
+    txt_files = [f for f in txt_files if os.path.basename(f) != "prediction_results.txt"]
 
     if len(txt_files) == 0:
         print(f"No .txt files found in: {root}")
