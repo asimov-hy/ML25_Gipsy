@@ -11,16 +11,16 @@ from model_definition import SensorLSTM
 from model_training import train_one_epoch, evaluate
 
 # ==========================================
-# CONFIGURATION - Training Data Path
+# CONFIGURATION - Updated for Generalization
 # ==========================================
-# Path to the integrated training dataset
 TRAIN_DATA_DIR = "../data/integrated_data"  
-EPOCHS = 200
+EPOCHS = 100            # Reduced (200 -> 100) to prevent memorization
 BATCH_SIZE = 16
 LEARNING_RATE = 0.001
-HIDDEN_SIZE = 64
+HIDDEN_SIZE = 32        # Reduced (64 -> 32) to force feature learning
 SEED = 42
 SAVE_PATH = 'best_model.pt'
+WEIGHT_DECAY = 1e-4     # L2 Regularization
 # ==========================================
 
 def set_seed(seed):
@@ -36,7 +36,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # 1. Load Training Data (Directly from CSV folders)
+    # 1. Load Training Data
     print(f"Loading Training Data from: {TRAIN_DATA_DIR}")
     sequences, labels, label_map = load_data_from_folder(TRAIN_DATA_DIR)
     
@@ -44,16 +44,14 @@ def main():
         print("Error: No data loaded. Check the directory path.")
         return
 
-    # 2. Split Data (Train vs Validation only)
-    # We do NOT create a Test set here because we use an external dataset for testing.
+    # 2. Split Data
     train_seqs, val_seqs, train_labels, val_labels = train_test_split(
         sequences, labels, test_size=0.2, stratify=labels, random_state=SEED
     )
     
     print(f"Train samples: {len(train_seqs)} | Val samples: {len(val_seqs)}")
 
-    # 3. Create Datasets
-    # Apply Augmentation to Training set ONLY
+    # 3. Create Datasets (Train set uses heavy augmentation)
     train_dataset = SensorDataset(train_seqs, train_labels, augment=True)
     val_dataset = SensorDataset(val_seqs, val_labels, augment=False)
 
@@ -65,7 +63,9 @@ def main():
     model.to(device)
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    
+    # Optimizer with Weight Decay (L2 Regularization)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
     # 5. Training Loop
     best_acc = 0.0
@@ -75,11 +75,9 @@ def main():
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc, _, _ = evaluate(model, dev_loader, criterion, device)
         
-        # Log progress
         if epoch % 10 == 0 or epoch == 1:
             print(f"Epoch {epoch}/{EPOCHS} | Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}")
         
-        # Save best model
         if val_acc > best_acc:
             best_acc = val_acc
             torch.save(model.state_dict(), SAVE_PATH)

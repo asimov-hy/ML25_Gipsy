@@ -16,7 +16,9 @@ from model_training import evaluate
 TEST_DATA_DIR = "../data/testdata_generated_ver2(100perclass)" 
 MODEL_PATH = 'best_model.pt'
 BATCH_SIZE = 16
-HIDDEN_SIZE = 64
+
+# [FIXED] HIDDEN_SIZE must match the training configuration (64 -> 32)
+HIDDEN_SIZE = 32  
 # ==========================================
 
 def main():
@@ -46,8 +48,8 @@ def main():
     try:
         model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
     except RuntimeError as e:
-        print("Error loading model: Class count mismatch?")
-        print("The number of classes in the trained model might differ from the test dataset.")
+        print("Error loading model: Hyperparameter mismatch?")
+        print("Ensure that HIDDEN_SIZE in classifier_test.py matches the value used in main.py.")
         print(e)
         return
 

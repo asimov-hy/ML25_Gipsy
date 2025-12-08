@@ -7,33 +7,78 @@ import glob
 from scipy.signal import butter, filtfilt
 
 # ==========================================
-# Data Augmentation (Jittering & Scaling)
+# Data Augmentation (Jittering, Scaling, Rotation)
 # ==========================================
 class DataAugmenter:
     """
     Applies augmentation techniques to time-series data.
-    Techniques: Jittering (Noise) & Scaling
+    Techniques: Jittering (Noise), Scaling, and 3D Rotation.
     """
-    def __init__(self, jitter_sigma=0.03, scale_sigma=0.05):
+    def __init__(self, jitter_sigma=0.1, scale_sigma=0.2, rotate_angle=15.0):
+        # Increased sigma values for stronger augmentation
         self.jitter_sigma = jitter_sigma
         self.scale_sigma = scale_sigma
+        self.rotate_angle = np.radians(rotate_angle) # Convert degrees to radians
 
     def jitter(self, x):
-        # Add Gaussian noise
+        """Add Gaussian noise to the trajectory."""
         noise = np.random.normal(loc=0, scale=self.jitter_sigma, size=x.shape)
         return x + noise
 
     def scale(self, x):
-        # Scale the signal magnitude
+        """Scale the trajectory size (simulate different arm lengths/ranges)."""
         factor = np.random.normal(loc=1.0, scale=self.scale_sigma, size=(1, x.shape[1])) 
         return x * factor
 
+    def rotate(self, x):
+        """
+        Apply a random 3D rotation to the trajectory.
+        This helps the model recognize tilted shapes (e.g., tilted vertical lines).
+        """
+        # Generate random angles for X, Y, Z axes
+        theta_x = np.random.uniform(-self.rotate_angle, self.rotate_angle)
+        theta_y = np.random.uniform(-self.rotate_angle, self.rotate_angle)
+        theta_z = np.random.uniform(-self.rotate_angle, self.rotate_angle)
+
+        # Rotation Matrices
+        rx = np.array([
+            [1, 0, 0],
+            [0, np.cos(theta_x), -np.sin(theta_x)],
+            [0, np.sin(theta_x), np.cos(theta_x)]
+        ])
+        
+        ry = np.array([
+            [np.cos(theta_y), 0, np.sin(theta_y)],
+            [0, 1, 0],
+            [-np.sin(theta_y), 0, np.cos(theta_y)]
+        ])
+        
+        rz = np.array([
+            [np.cos(theta_z), -np.sin(theta_z), 0],
+            [np.sin(theta_z), np.cos(theta_z), 0],
+            [0, 0, 1]
+        ])
+
+        # Combined Rotation Matrix
+        r = rz @ ry @ rx
+        
+        # Apply rotation (x is N x 3) -> (x @ r.T)
+        return x @ r.T
+
     def augment(self, x):
-        # Apply random augmentation with 50% probability
-        if np.random.rand() < 0.5:
+        """Apply random augmentations."""
+        # Jittering (High probability)
+        if np.random.rand() < 0.7:
             x = self.jitter(x)
-        if np.random.rand() < 0.5:
+        
+        # Scaling (High probability)
+        if np.random.rand() < 0.7:
             x = self.scale(x)
+            
+        # Rotation (Medium probability)
+        if np.random.rand() < 0.5:
+            x = self.rotate(x)
+            
         return x
 
 # ==========================================
@@ -50,7 +95,6 @@ def butter_lowpass_filter(data, cutoff=3.0, fs=30.0, order=5):
         # axis=0: Time dimension
         return filtfilt(b, a, data, axis=0)
     except Exception as e:
-        # Return original data if filtering fails (e.g., sequence too short)
         return data
 
 # ==========================================
@@ -70,7 +114,7 @@ class SensorDataset(Dataset):
         seq = self.sequences[idx]
         label = self.labels[idx]
         
-        # Apply augmentation only if enabled (usually for Training set)
+        # Apply augmentation only if enabled (Training set)
         if self.augment:
             seq_np = seq.numpy()
             seq_np = self.augmenter.augment(seq_np)
@@ -80,12 +124,7 @@ class SensorDataset(Dataset):
 
 def load_data_from_folder(root_dir, apply_filter=True):
     """
-    Reads all CSV files recursively from a directory structure:
-    root_dir/
-      class_A/
-        1.csv
-      class_B/
-        ...
+    Reads all CSV files recursively from a directory structure.
     """
     if not os.path.exists(root_dir):
         raise FileNotFoundError(f"Directory not found: {root_dir}")
@@ -93,8 +132,7 @@ def load_data_from_folder(root_dir, apply_filter=True):
     sequences = []
     labels = []
     
-    # 1. Read and Sort Class Directories
-    # CRITICAL: Sorting ensures that Class ID mapping (0, 1, 2...) is consistent between Train and Test sets.
+    # Read and Sort Class Directories
     classes = sorted([d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))])
     label_map = {cls_name: i for i, cls_name in enumerate(classes)}
     
@@ -105,7 +143,6 @@ def load_data_from_folder(root_dir, apply_filter=True):
     
     for class_name in classes:
         class_dir = os.path.join(root_dir, class_name)
-        # Find all CSV files in the class folder
         csv_files = glob.glob(os.path.join(class_dir, "*.csv"))
         
         for file_path in csv_files:
@@ -114,7 +151,7 @@ def load_data_from_folder(root_dir, apply_filter=True):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     lines = f.readlines()
                 
-                # Check for header (x,y,z) and skip it
+                # Check for header
                 start_idx = 0
                 if len(lines) > 0 and "x" in lines[0].lower() and "y" in lines[0].lower():
                     start_idx = 1
@@ -123,7 +160,6 @@ def load_data_from_folder(root_dir, apply_filter=True):
                     line = line.strip()
                     if not line: continue
                     
-                    # Parse comma-separated values
                     parts = line.split(',')
                     if len(parts) >= 3:
                         try:
@@ -150,18 +186,10 @@ def load_data_from_folder(root_dir, apply_filter=True):
     return sequences, labels, label_map
 
 def collate_fn(batch):
-    """
-    Custom collate function to handle variable-length sequences.
-    Sorts sequences by length and pads them.
-    """
     sequences, labels = zip(*batch)
     lengths = torch.tensor([len(seq) for seq in sequences])
-    
-    # Sort by length (descending) required for pack_padded_sequence
     sorted_lengths, sorted_idx = lengths.sort(descending=True)
     sorted_sequences = [sequences[i] for i in sorted_idx]
     sorted_labels = torch.tensor([labels[i] for i in sorted_idx], dtype=torch.long)
-    
-    # Pad sequences
     padded_seqs = pad_sequence(sorted_sequences, batch_first=True)
     return padded_seqs, sorted_labels, sorted_lengths
