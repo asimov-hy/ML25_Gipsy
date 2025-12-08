@@ -6,25 +6,25 @@ import random
 import numpy as np
 import os
 
-from preprocessing import load_data, SensorDataset, collate_fn
+from preprocessing import load_data_from_folder, SensorDataset, collate_fn
 from model_definition import SensorLSTM
 from model_training import train_one_epoch, evaluate
 
 # ==========================================
-# CONFIGURATION
+# CONFIGURATION - Updated for Generalization
 # ==========================================
-# Path to the pre-processed pickle file
-DATA_PATH = "../data/processed/dataset1+2_raw.pkl"
-
-EPOCHS = 200
+TRAIN_DATA_DIR = "../data/integrated_data"  
+EPOCHS = 100            # Reduced (200 -> 100) to prevent memorization
 BATCH_SIZE = 16
 LEARNING_RATE = 0.001
-HIDDEN_SIZE = 64
+HIDDEN_SIZE = 32        # Reduced (64 -> 32) to force feature learning
 SEED = 42
 SAVE_PATH = 'best_model.pt'
+WEIGHT_DECAY = 1e-4     # L2 Regularization
 # ==========================================
 
 def set_seed(seed):
+    """Set random seed for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -35,37 +35,37 @@ def main():
     set_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    
-    # 1. Load Data from Pickle
-    sequences, labels, label_map = load_data(DATA_PATH)
+
+    # 1. Load Training Data
+    print(f"Loading Training Data from: {TRAIN_DATA_DIR}")
+    sequences, labels, label_map = load_data_from_folder(TRAIN_DATA_DIR)
     
     if len(sequences) == 0:
-        print("Error: No data loaded. Check the pickle file path.")
+        print("Error: No data loaded. Check the directory path.")
         return
 
     # 2. Split Data
-    # Stratified split to maintain class balance
-    train_seqs, temp_seqs, train_labels, temp_labels = train_test_split(
-        sequences, labels, test_size=0.3, stratify=labels, random_state=SEED
+    train_seqs, val_seqs, train_labels, val_labels = train_test_split(
+        sequences, labels, test_size=0.2, stratify=labels, random_state=SEED
     )
-    dev_seqs, test_seqs, dev_labels, test_labels = train_test_split(
-        temp_seqs, temp_labels, test_size=0.5, stratify=temp_labels, random_state=SEED
-    )
+    
+    print(f"Train samples: {len(train_seqs)} | Val samples: {len(val_seqs)}")
 
-    # 3. Create Datasets
-    # Apply Augmentation ONLY to the Training set
+    # 3. Create Datasets (Train set uses heavy augmentation)
     train_dataset = SensorDataset(train_seqs, train_labels, augment=True)
-    dev_dataset = SensorDataset(dev_seqs, dev_labels, augment=False)
+    val_dataset = SensorDataset(val_seqs, val_labels, augment=False)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
-    dev_loader = DataLoader(dev_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
+    dev_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
 
     # 4. Initialize Model
     model = SensorLSTM(input_size=3, hidden_size=HIDDEN_SIZE, num_layers=2, num_classes=len(label_map))
     model.to(device)
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    
+    # Optimizer with Weight Decay (L2 Regularization)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
     # 5. Training Loop
     best_acc = 0.0
@@ -75,13 +75,13 @@ def main():
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc, _, _ = evaluate(model, dev_loader, criterion, device)
         
-        if epoch % 5 == 0 or epoch == 1:
+        if epoch % 10 == 0 or epoch == 1:
             print(f"Epoch {epoch}/{EPOCHS} | Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}")
         
         if val_acc > best_acc:
             best_acc = val_acc
             torch.save(model.state_dict(), SAVE_PATH)
-            print(f"  -> Model saved to {SAVE_PATH}")
+            print(f"  -> Model saved to {SAVE_PATH} (Acc: {best_acc:.4f})")
 
     print(f"\nTraining Finished. Best Validation Accuracy: {best_acc:.4f}")
 
