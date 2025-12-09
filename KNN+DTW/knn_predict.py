@@ -1,3 +1,7 @@
+"""KNN + DTW Prediction Script
+Predicts gesture classes using a trained KNN model with DTW distance metric.
+Loads CSV files containing time series data and outputs predicted classes."""
+
 # ============================================
 # CONFIGURATION
 # ============================================
@@ -26,9 +30,6 @@ def normalize_sequence(seq):
     return (seq - mean) / std
 
 
-
-
-
 def prepare_single_sample(seq, max_len):
     """Prepare single sequence for prediction (pad to max_len)"""
     n_features = seq.shape[1]
@@ -42,7 +43,7 @@ def predict_csv(csv_path, model, label_map, return_proba=False):
     Predict class for a single CSV file.
     
     Args:
-        csv_path: Path to CSV with x,y,z columns
+        csv_path: Path to CSV with x,y,z columns (no header)
         model: Trained KNN model
         label_map: {class_name: index}
         return_proba: If True, return neighbor voting distribution
@@ -51,8 +52,8 @@ def predict_csv(csv_path, model, label_map, return_proba=False):
         predicted_class: Class name string
         confidence: Voting confidence (if return_proba=True)
     """
-    # Load and normalize
-    df = pd.read_csv(csv_path)
+    # Load and normalize (no header in CSV)
+    df = pd.read_csv(csv_path, header=None, names=['x', 'y', 'z'])
     seq = df[['x', 'y', 'z']].values.astype(np.float32)
     seq_norm = normalize_sequence(seq)
     
@@ -137,10 +138,10 @@ if __name__ == "__main__":
     
     # Check for input file
     if len(sys.argv) < 2:
-        print("\nUsage: python predict.py <path_to_csv>")
-        print("       python predict.py <csv1> <csv2> <csv3> ...")
+        print("\nUsage: python knn_predict.py <path_to_csv>")
+        print("       python knn_predict.py <csv1> <csv2> <csv3> ...")
         print("\nExample:")
-        print("  python predict.py data/test_gesture.csv")
+        print("  python knn_predict.py data/test_gesture.csv")
         sys.exit(1)
     
     csv_paths = sys.argv[1:]

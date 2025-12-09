@@ -1,156 +1,103 @@
-# ============================================================
-# 2_feature_engineering.py  (FINAL MERGED VERSION)
-# 기존 feature + Smart feature 모두 포함 (총 26개)
-# ============================================================
-
 import numpy as np
 from scipy.stats import pearsonr
+# from scipy.signal import welch # 사용되지 않는 모듈은 주석 처리 또는 제거
+
+# ------------------------------------------------------
+# 1. 기본 특징 추출 (Basic Features) - 사용은 안하지만 함수 정의는 유지
+# ------------------------------------------------------
+def extract_basic_features(data):
+    # ... (기존 9개 특징 계산 로직) ...
+    # 이 함수는 아래의 extract_features에서는 호출되지 않습니다.
+    return np.array([0.0] * 9) # 임시로 9개짜리 배열을 반환한다고 가정
 
 
-# ------------------------------------------------------------
-# 🧠 SMART FEATURE EXTRACTOR
-# ------------------------------------------------------------
-
+# ------------------------------------------------------
+# 2. 스마트 특징 추출 (Smart Features) - 17개
+# ------------------------------------------------------
 def extract_smart_features(data):
+    """
+    Statistical and kinematic features for complex motion. (17 features)
+    """
     data = np.array(data)
 
-    # 1) 위치 기반 통계
-    mean = np.mean(data, axis=0)
-    var = np.var(data, axis=0)
+    # 1) 위치 통계: 평균 및 분산 (6개)
+    mean_x, mean_y, mean_z = np.mean(data, axis=0)
+    var_x, var_y, var_z = np.var(data, axis=0)
 
-    # 2) 안전한 상관계수 (대각선 방향 구분)
-    def safe_corr(a, b):
-        return pearsonr(a, b)[0] if np.std(a)>1e-6 and np.std(b)>1e-6 else 0
+    # 2) 상관 계수 (3개)
+    corr_xy = pearsonr(data[:, 0], data[:, 1])[0]
+    corr_yz = pearsonr(data[:, 1], data[:, 2])[0]
+    corr_zx = pearsonr(data[:, 2], data[:, 0])[0]
 
-    corr_xy = safe_corr(data[:,0], data[:,1])
-    corr_yz = safe_corr(data[:,1], data[:,2])
-    corr_zx = safe_corr(data[:,2], data[:,0])
+    # 3) 선형성 (Linearity)
+    start_point = data[0]
+    line_vec = data[-1] - start_point
+    
+    if np.linalg.norm(line_vec) > 1e-6:
+        line_vec = line_vec / np.linalg.norm(line_vec)
+        projected_dist = np.dot(data - start_point, line_vec)
+        linearity = np.var(projected_dist) / (np.var(np.linalg.norm(data - start_point, axis=1)) + 1e-6)
+    else:
+        linearity = 0.0
 
-    # 3) 원 모양 판단 (linearity)
-    displacement = np.linalg.norm(data[-1] - data[0])
-    step = np.linalg.norm(np.diff(data, axis=0), axis=1)
-    total_path = np.sum(step)
-    linearity = displacement / (total_path + 1e-6)
+    # 4) 폐쇄성 (Closure)
+    closure = np.linalg.norm(data[-1] - data[0])
 
-    # 4) start-end closure (circle 판단)
-    closure = np.linalg.norm(data[0] - data[-1])
-
-    # 5) Variance ratio (축 별 비율)
-    total_var = np.sum(var) + 1e-6
-    var_ratio = var / total_var
-
-    # 6) 속도 기반 특징
-    vel = step
-    mean_vel = np.mean(vel)
-    max_vel = np.max(vel)
-
-    # 7) 평균 회전각 (circle은 회전 많음)
+    # 5) 속도 통계
+    velocity = np.linalg.norm(np.diff(data, axis=0), axis=1)
+    mean_vel = np.mean(velocity)
+    max_vel_smart = np.max(velocity)
+    
+    # 6) 평균 회전각 (Mean Turning Angle)
     angles = []
     for i in range(len(data)-2):
         a = data[i+1] - data[i]
         b = data[i+2] - data[i+1]
         denom = (np.linalg.norm(a)*np.linalg.norm(b) + 1e-6)
-        ang = np.arccos(np.clip(np.dot(a,b)/denom, -1, 1))
+        ang = np.arccos(np.clip(np.dot(a,b)/denom, -1, 1)) 
         angles.append(ang)
-    mean_turn_angle = np.mean(angles)
+        
+    mean_turn_angle = np.mean(angles) if angles else 0.0
+
+    # 7) 축별 분산 비율 (3개)
+    var_ratio_x = var_y / (var_x + 1e-6)
+    var_ratio_y = var_z / (var_y + 1e-6)
+    var_ratio_z = var_x / (var_z + 1e-6)
 
     return np.array([
-        # 위치 기반 정보
-        mean[0], mean[1], mean[2],
-        var[0], var[1], var[2],
-
-        # 대각선 방향 관련
+        mean_x, mean_y, mean_z, var_x, var_y, var_z,
         corr_xy, corr_yz, corr_zx,
-
-        # 원/직선 관련
         linearity, closure,
-
-        # 속도 정보
-        mean_vel, max_vel,
-
-        # 방향 전환량
-        mean_turn_angle,
-
-        # 축 비율
-        var_ratio[0], var_ratio[1], var_ratio[2]
+        mean_vel, max_vel_smart, mean_turn_angle,
+        var_ratio_x, var_ratio_y, var_ratio_z
     ])
 
 
-# ------------------------------------------------------------
-# 🏗 기존 FEATURE (너의 원래 코드 기반)
-# ------------------------------------------------------------
+# ------------------------------------------------------
+# 3. 메인 특징 추출 함수 (17개 특징만 반환하도록 수정)
+# ------------------------------------------------------
 
-def extract_basic_features(data):
-
-    vel = np.linalg.norm(np.diff(data, axis=0), axis=1)
-    max_vel = np.max(vel)
-
-    var_y = np.var(data[:, 1])
-    var_z = np.var(data[:, 2])
-    ratio_yz = var_y / (var_z + 1e-6)
-
-    mean_x = np.mean(data[:, 0])
-    mean_y = np.mean(data[:, 1])
-
-    step = np.linalg.norm(np.diff(data, axis=0), axis=1)
-    path_length = np.sum(step)
-
-    dist_se = np.linalg.norm(data[-1] - data[0])
-    linearity_ratio = dist_se / (path_length + 1e-6)
-
-    range_x = np.ptp(data[:, 0])
-    range_y = np.ptp(data[:, 1])
-    range_z = np.ptp(data[:, 2])
-
-    return np.array([
-        mean_x,
-        max_vel,
-        ratio_yz,
-        mean_y,
-        path_length,
-        linearity_ratio,
-        range_x,
-        range_y,
-        range_z
-    ])
-
-
-# ------------------------------------------------------------
-# 🎯 최종 FEATURE 합본 (기존 9개 + 스마트 17개 = 총 26개)
-# ------------------------------------------------------------
+# 17개 스마트 특징의 이름
+feature_names_17 = [
+    's_mean_x', 's_mean_y', 's_mean_z', 's_var_x', 's_var_y', 's_var_z',
+    'corr_xy', 'corr_yz', 'corr_zx',
+    'linearity', 'closure',
+    'mean_vel', 'max_vel_smart', 'turn_angle_mean',
+    'var_ratio_x', 'var_ratio_y', 'var_ratio_z'
+]
 
 def extract_features(X):
     """
     X : (N, 100, 3) shaped preprocessed sequences
-    return: (N, 26) feature array + feature names
+    return: (N, 17) feature array + feature names (Smart Features Only)
     """
-
     feature_list = []
 
     for seq in X:
-        f_basic = extract_basic_features(seq)            # 기존 feature 9개
-        f_smart = extract_smart_features(seq)            # 스마트 feature 17개
-        combined = np.concatenate([f_basic, f_smart])    # 총 26개
-
-        feature_list.append(combined)
+        # 17개 스마트 특징만 추출
+        f_smart = extract_smart_features(seq)
+        feature_list.append(f_smart)
 
     feature_list = np.array(feature_list)
-
-    # 이름 매핑
-    feature_names = [
-        # 기존 feature
-        "mean_x", "max_vel", "ratio_yz", "mean_y",
-        "path_length", "linearity_ratio",
-        "range_x", "range_y", "range_z",
-
-        # 스마트 feature
-        "s_mean_x", "s_mean_y", "s_mean_z",
-        "s_var_x", "s_var_y", "s_var_z",
-        "corr_xy", "corr_yz", "corr_zx",
-        "smart_linearity", "closure",
-        "mean_vel", "max_vel_smart",
-        "turn_angle_mean",
-        "var_ratio_x", "var_ratio_y", "var_ratio_z"
-    ]
-
-    return feature_list, feature_names
+    
+    return feature_list, feature_names_17

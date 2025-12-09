@@ -16,45 +16,15 @@ def import_module_from_file(file_path, module_name):
 # ------------------------------------------------------
 # Import project modules
 # ------------------------------------------------------
+# 경로가 ML25_Gipsy 폴더 기준이라고 가정
 preprocessing = import_module_from_file("1_preprocessing.py", "preprocessing")
 feature_engineering = import_module_from_file("feature_engineering.py", "feature_engineering")
 model_training = import_module_from_file("3_model_training.py", "model_training")
 
-# Bind functions
+# Bind functions (17개 특징을 반환하도록 수정한 feature_engineering.extract_features를 사용)
 load_and_preprocess_data = preprocessing.load_and_preprocess_data
-extract_smart_features = feature_engineering.extract_smart_features  # from your new file
+extract_features_17 = feature_engineering.extract_features 
 train_and_explain_model = model_training.train_and_explain_model
-
-
-# ------------------------------------------------------
-# Wrapper for feature extraction over all sequences
-# ------------------------------------------------------
-def extract_features(X_seq):
-    """
-    X_seq: (N, T, 3)
-    returns:
-        X_feat: (N, F)
-        feat_names: list of feature names
-    """
-    feature_list = []
-
-    for seq in X_seq:
-        feat = extract_smart_features(seq)
-        feature_list.append(feat)
-
-    X_feat = np.array(feature_list)
-
-    feat_names = [
-        "mean_x", "mean_y", "mean_z",
-        "var_x", "var_y", "var_z",
-        "corr_xy", "corr_yz", "corr_zx",
-        "linearity", "closure",
-        "mean_vel", "max_vel",
-        "mean_turn_angle",
-        "var_ratio_x", "var_ratio_y", "var_ratio_z"
-    ]
-
-    return X_feat, feat_names
 
 
 # ------------------------------------------------------
@@ -71,7 +41,7 @@ RANDOM_STATE = 42
 # ------------------------------------------------------
 def main():
     print("="*60)
-    print("TRAINING MOTION CLASSIFIER")
+    print("TRAINING MOTION CLASSIFIER (17 Features)")
     print("="*60)
 
     # Step 1: Load
@@ -87,8 +57,9 @@ def main():
     print(f"   Classes: {np.unique(labels)}")
 
     # Step 2: Feature extraction
-    print("\n[2/3] Extracting features...")
-    X_feat, feat_names = extract_features(X_denoised)
+    print("\n[2/3] Extracting features (17 Dims)...")
+    # 17개 특징 추출 함수 호출
+    X_feat, feat_names = extract_features_17(X_denoised)
     print(f"✅ Extracted features: {X_feat.shape[1]} dims")
     print(f"   Feature names: {feat_names}")
 

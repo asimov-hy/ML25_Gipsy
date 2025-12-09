@@ -1,8 +1,8 @@
 # ============================================
 # CONFIGURATION - Change these paths as needed
 # ============================================
-INPUT_DIR = "data/data1-RAW"
-OUTPUT_DIR = "data/data1-filtered"
+INPUT_DIR = "data\\RAW_data\\data1-RAW"
+OUTPUT_DIR = "data\\data1-filtered"
 # ============================================
 
 import os
@@ -48,9 +48,8 @@ def process_file(input_path, output_path):
     # Create output directory if needed
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Write CSV
+    # Write CSV (no header)
     with open(output_path, "w") as f:
-        f.write("x,y,z\n")
         for x, y, z in data:
             f.write(f"{x},{y},{z}\n")
     
