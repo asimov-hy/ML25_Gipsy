@@ -7,7 +7,7 @@
 •	5_classifier_test.py: 테스트 데이터 평가 (CSV 입력)\
 •	run_all_RF.py: 배치 추론 (TXT 입력)\
 •	generate_testdata_ver2.py: 합성 테스트 데이터 생성\
----
+
 ## B. 실행 순서
 1.	학습: python 4_main.py
 2.	테스트 데이터 생성: python generate_testdata_ver2.py
